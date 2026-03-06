@@ -65,7 +65,7 @@
 
 ## 快速开始
 
-### 方式一：Docker 部署
+### 方式一：Docker Compose 命令行部署
 
 ```bash
 # 1. 复制配置文件
@@ -82,14 +82,26 @@ docker compose up -d
 # 启动后在浏览器访问 http://localhost:<端口>
 ```
 
-### 方式二：使用 MySQL（Compose 内 MySQL）
+### 方式二：Docker Compose 可视化部署
+
+1. 在可视化界面中搜索镜像仓库：`woshidayingxiong77240/arboris-novel`
+2. 选择镜像后创建部署（或创建 Compose 应用）
+3. 配置存储映射（Volume）时：
+   - 左侧（宿主机路径）改成你自己的实际路径
+   - 右侧（容器内路径）是部署后数据存放位置，一般不需要修改
+
+![Docker 镜像搜索](docs/images/quickstart/docker-compose-visual-step1.png)
+![配置存储映射）](docs/images/quickstart/docker-compose-visual-step2.png)
+
+
+### 方式三：使用 MySQL（Compose 内 MySQL）
 
 ```bash
 # .env 中设置 DB_PROVIDER=mysql，然后执行：
 DB_PROVIDER=mysql docker compose --profile mysql up -d
 ```
 
-### 方式三：使用自有 MySQL
+### 方式四：使用自有 MySQL
 
 ```bash
 # 在 .env 中配置数据库地址、用户名、密码后执行：

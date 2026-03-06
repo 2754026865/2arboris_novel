@@ -384,7 +384,8 @@ class LLMService:
             else ""
         )
 
-        provider = user_embedding_provider_format or ((await self._get_config_value("embedding.provider")) or "ollama").strip().lower()
+        provider = user_embedding_provider_format if user_embedding_provider_format in {"openai", "ollama"} else "openai"
+
         if provider not in {"openai", "ollama"}:
             logger.error("非法 embedding.provider 配置: %s", provider)
             raise HTTPException(status_code=500, detail="embedding.provider 仅支持 openai 或 ollama")
@@ -505,7 +506,7 @@ class LLMService:
 
     async def get_embedding_dimension(self, model: Optional[str] = None) -> Optional[int]:
         """获取嵌入向量维度，优先返回缓存结果，其次读取配置。"""
-        provider = await self._get_config_value("embedding.provider") or "ollama"
+        provider = await self._get_config_value("embedding.provider") or "openai"
         default_model = (
             await self._get_config_value("ollama.embedding_model") or "nomic-embed-text:latest"
             if provider == "ollama"

@@ -1,8 +1,8 @@
 // AIMETA P=LLM_API客户端_模型配置接口|R=LLM配置CRUD|NR=不含UI逻辑|E=api:llm|X=internal|A=llmApi对象|D=axios|S=net|RD=./README.ai
 import { useAuthStore } from '@/stores/auth';
+import { API_BASE_URL, API_PREFIX } from './base';
 
-const API_PREFIX = '/api';
-const LLM_BASE = `${API_PREFIX}/llm-config`;
+const LLM_BASE = `${API_BASE_URL}${API_PREFIX}/llm-config`;
 
 export interface LLMConfig {
   user_id: number;
@@ -27,10 +27,13 @@ export interface LLMConfigCreate {
 
 const getHeaders = () => {
   const authStore = useAuthStore();
-  return {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${authStore.token}`,
   };
+  if (authStore.token) {
+    headers.Authorization = `Bearer ${authStore.token}`;
+  }
+  return headers;
 };
 
 export const getLLMConfig = async (): Promise<LLMConfig | null> => {

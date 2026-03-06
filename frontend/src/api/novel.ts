@@ -1,13 +1,7 @@
 // AIMETA P=小说API客户端_小说和章节接口|R=小说CRUD_章节管理_生成|NR=不含UI逻辑|E=api:novel|X=internal|A=novelApi对象|D=axios|S=net|RD=./README.ai
 import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
-
-// API 配置
-// 默认同源请求（开发环境由 Vite 代理 /api 到后端），
-// 需要直连后端时可通过 VITE_API_BASE_URL 覆盖。
-const configuredApiBase = String(import.meta.env.VITE_API_BASE_URL || '').trim()
-export const API_BASE_URL = configuredApiBase
-export const API_PREFIX = '/api'
+import { API_BASE_URL, API_PREFIX } from './base'
 
 // 统一的请求处理函数
 const request = async (url: string, options: RequestInit = {}) => {

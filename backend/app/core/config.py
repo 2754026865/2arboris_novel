@@ -89,7 +89,7 @@ class Settings(BaseSettings):
         description="每次生成章节的候选版本数量（支持 1~2）",
     )
     embedding_provider: str = Field(
-        default="ollama",
+        default="openai",
         env="EMBEDDING_PROVIDER",
         description="嵌入模型提供方，支持 openai 或 ollama",
     )
@@ -205,7 +205,7 @@ class Settings(BaseSettings):
     @validator("embedding_provider", pre=True)
     def _normalize_embedding_provider(cls, value: Optional[str]) -> str:
         """限制嵌入模型提供方的取值范围。"""
-        candidate = (value or "ollama").strip().lower()
+        candidate = (value or "openai").strip().lower()
         if candidate not in {"openai", "ollama"}:
             raise ValueError("EMBEDDING_PROVIDER 仅支持 openai 或 ollama")
         return candidate

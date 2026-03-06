@@ -2,6 +2,7 @@
 import asyncio
 from typing import Dict, Optional
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Prompt
@@ -62,9 +63,16 @@ class PromptService:
         tags = data.get("tags")
         if tags is not None:
             data["tags"] = ",".join(tags)
+        existing = await self.repo.get_by_name(data["name"])
+        if existing:
+            raise ValueError("提示词名称已存在")
         prompt = Prompt(**data)
         await self.repo.add(prompt)
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise ValueError("提示词名称已存在或字段长度超限") from exc
         prompt_read = PromptRead.model_validate(prompt)
         async with _LOCK:
             _CACHE[prompt_read.name] = prompt_read
@@ -80,7 +88,11 @@ class PromptService:
         if "tags" in update_data and update_data["tags"] is not None:
             update_data["tags"] = ",".join(update_data["tags"])
         await self.repo.update_fields(instance, **update_data)
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise ValueError("提示词字段不合法或长度超限") from exc
         prompt_read = PromptRead.model_validate(instance)
         async with _LOCK:
             _CACHE[prompt_read.name] = prompt_read

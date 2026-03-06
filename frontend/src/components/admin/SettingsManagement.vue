@@ -1,11 +1,69 @@
 <!-- AIMETA P=设置管理_系统设置界面|R=系统配置表单|NR=不含用户设置|E=component:SettingsManagement|X=ui|A=设置组件|D=vue|S=dom,net|RD=./README.ai -->
 <template>
   <n-space vertical size="large" class="admin-settings">
+    <n-card :bordered="false" class="overview-card">
+      <div class="overview-header">
+        <div class="overview-copy">
+          <h3 class="overview-title">系统配置中心</h3>
+          <p class="overview-subtitle">
+            常用配置建议通过下方快捷卡片维护，避免误改关键键值；复杂配置可在表格中检索和编辑。
+          </p>
+        </div>
+        <n-space class="overview-tags" :size="8">
+          <n-tag type="success" :bordered="false">配置总数 {{ configs.length }}</n-tag>
+          <n-tag type="warning" :bordered="false">托管项 {{ managedConfigs.length }}</n-tag>
+          <n-tag :bordered="false">普通项 {{ customConfigsCount }}</n-tag>
+        </n-space>
+      </div>
+    </n-card>
+
+    <div class="meta-grid">
+      <n-card :bordered="false" class="meta-card">
+        <template #header>
+          <div class="card-header">
+            <div>
+              <span class="card-title">配置健康状态</span>
+              <p class="card-subtitle">快速确认关键配置是否处于可用状态。</p>
+            </div>
+          </div>
+        </template>
+        <div class="health-grid">
+          <div class="health-item">
+            <div class="health-label">章节候选版本数</div>
+            <div class="health-value">{{ chapterVersionCount }}</div>
+            <n-tag :type="chapterVersionHealthy ? 'success' : 'error'" :bordered="false">
+              {{ chapterVersionHealthy ? '有效' : '异常' }}
+            </n-tag>
+          </div>
+          <div class="health-item">
+            <div class="health-label">版本信息源地址</div>
+            <div class="health-value health-value-url" :title="normalizedVersionInfoUrl || '未配置'">
+              {{ normalizedVersionInfoUrl || '未配置' }}
+            </div>
+            <n-tag :type="versionSourceHealthy ? 'success' : 'warning'" :bordered="false">
+              {{ versionSourceHealthy ? '可解析 URL' : '待配置' }}
+            </n-tag>
+          </div>
+          <div class="health-item">
+            <div class="health-label">远程版本状态</div>
+            <div class="health-value">{{ remoteVersion || '未检测' }}</div>
+            <n-tag :type="versionSyncTagType" :bordered="false">
+              {{ versionSyncText }}
+            </n-tag>
+          </div>
+        </div>
+      </n-card>
+    </div>
+
     <div class="top-settings-grid">
       <n-card :bordered="false" class="top-settings-card">
         <template #header>
           <div class="card-header">
-            <span class="card-title">章节生成版本数</span>
+            <div>
+              <span class="card-title">章节生成版本数</span>
+              <p class="card-subtitle">控制每章候选草稿数量，影响生成时长与候选对比空间。</p>
+            </div>
+            <n-tag :bordered="false" type="info">托管项</n-tag>
           </div>
         </template>
         <n-spin :show="configLoading || chapterVersionSaving">
@@ -38,7 +96,11 @@
       <n-card :bordered="false" class="top-settings-card">
         <template #header>
           <div class="card-header">
-            <span class="card-title">版本检查源</span>
+            <div>
+              <span class="card-title">版本检查源</span>
+              <p class="card-subtitle">配置远程版本 JSON，支持一键检测本地与远程版本差异。</p>
+            </div>
+            <n-tag :bordered="false" type="info">托管项</n-tag>
           </div>
         </template>
         <n-spin :show="configLoading || versionSourceSaving">
@@ -99,7 +161,10 @@
     <n-card :bordered="false">
       <template #header>
         <div class="card-header">
-          <span class="card-title">系统配置</span>
+          <div>
+            <span class="card-title">系统配置</span>
+            <p class="card-subtitle">支持按 Key、值、描述检索；托管项已在表格中高亮。</p>
+          </div>
           <n-button type="primary" size="small" @click="openCreateModal">
             新增配置
           </n-button>
@@ -110,13 +175,40 @@
         <n-alert v-if="configError" type="error" closable @close="configError = null">
           {{ configError }}
         </n-alert>
+        <n-alert type="warning" class="risk-alert">
+          删除配置会立即影响系统行为。托管项建议通过上方快捷卡片调整，不建议在表格中直接删除。
+        </n-alert>
+
+        <div class="table-toolbar">
+          <n-input
+            v-model:value="configKeyword"
+            clearable
+            class="toolbar-search"
+            placeholder="搜索 Key / 值 / 描述"
+          />
+          <n-switch v-model:value="managedOnly">
+            <template #checked>仅托管项</template>
+            <template #unchecked>仅托管项</template>
+          </n-switch>
+          <n-switch v-model:value="managedFirst">
+            <template #checked>托管优先排序</template>
+            <template #unchecked>托管优先排序</template>
+          </n-switch>
+        </div>
+
+        <n-empty
+          v-if="!configLoading && !filteredConfigs.length"
+          :description="configKeyword || managedOnly ? '没有匹配的配置项' : '暂无配置项'"
+        />
 
         <n-data-table
+          v-else
           :columns="columns"
-          :data="configs"
+          :data="filteredConfigs"
           :loading="configLoading"
           :bordered="false"
           :row-key="rowKey"
+          :row-class-name="tableRowClassName"
           class="config-table"
         />
       </n-spin>
@@ -163,6 +255,7 @@ import {
   NButton,
   NCard,
   NDataTable,
+  NEmpty,
   NForm,
   NFormItem,
   NInput,
@@ -171,6 +264,8 @@ import {
   NPopconfirm,
   NSpace,
   NSpin,
+  NSwitch,
+  NTag,
   type DataTableColumns
 } from 'naive-ui'
 
@@ -192,6 +287,12 @@ const VERSION_INFO_URL_CONFIG_KEY = 'updates.version_info_url'
 const LEGACY_VERSION_INFO_URL_CONFIG_KEY = 'updates.github_json_url'
 const MIN_CHAPTER_VERSION_COUNT = 1
 const MAX_CHAPTER_VERSION_COUNT = 2
+const MANAGED_CONFIG_KEYS = new Set<string>([
+  WRITER_VERSION_CONFIG_KEY,
+  LEGACY_WRITER_VERSION_CONFIG_KEY,
+  VERSION_INFO_URL_CONFIG_KEY,
+  LEGACY_VERSION_INFO_URL_CONFIG_KEY
+])
 
 const chapterVersionCount = ref<number>(MIN_CHAPTER_VERSION_COUNT)
 const chapterVersionSaving = ref(false)
@@ -213,6 +314,9 @@ const configError = ref<string | null>(null)
 
 const configModalVisible = ref(false)
 const isCreateMode = ref(true)
+const configKeyword = ref('')
+const managedOnly = ref(false)
+const managedFirst = ref(true)
 const configForm = reactive<SystemConfig>({
   key: '',
   value: '',
@@ -222,6 +326,61 @@ const configForm = reactive<SystemConfig>({
 const rowKey = (row: SystemConfig) => row.key
 
 const modalTitle = computed(() => (isCreateMode.value ? '新增配置项' : '编辑配置项'))
+const managedConfigs = computed(() => configs.value.filter((item) => isManagedConfigKey(item.key)))
+const customConfigsCount = computed(() => Math.max(0, configs.value.length - managedConfigs.value.length))
+const normalizedVersionInfoUrl = computed(() => normalizeConfigText(versionInfoUrl.value))
+const chapterVersionHealthy = computed(
+  () => chapterVersionCount.value >= MIN_CHAPTER_VERSION_COUNT && chapterVersionCount.value <= MAX_CHAPTER_VERSION_COUNT
+)
+const versionSourceHealthy = computed(
+  () => normalizedVersionInfoUrl.value.length > 0 && isHttpUrl(normalizedVersionInfoUrl.value)
+)
+const versionSyncTagType = computed<'default' | 'warning' | 'success' | 'error'>(() => {
+  if (versionCheckLoading.value) {
+    return 'default'
+  }
+  if (versionCheckError.value) {
+    return 'error'
+  }
+  if (!remoteVersion.value) {
+    return 'warning'
+  }
+  return hasNewVersion.value ? 'warning' : 'success'
+})
+const versionSyncText = computed(() => {
+  if (versionCheckLoading.value) {
+    return '检测中'
+  }
+  if (versionCheckError.value) {
+    return '检测失败'
+  }
+  if (!remoteVersion.value) {
+    return '未解析'
+  }
+  return hasNewVersion.value ? '存在差异' : '与本地一致'
+})
+const filteredConfigs = computed(() => {
+  const keyword = normalizeConfigText(configKeyword.value).toLowerCase()
+  return configs.value
+    .filter((item) => {
+      if (managedOnly.value && !isManagedConfigKey(item.key)) {
+        return false
+      }
+      if (!keyword) {
+        return true
+      }
+      const key = item.key.toLowerCase()
+      const value = normalizeConfigText(item.value).toLowerCase()
+      const description = normalizeConfigText(item.description).toLowerCase()
+      return key.includes(keyword) || value.includes(keyword) || description.includes(keyword)
+    })
+    .sort((a, b) => {
+      if (managedFirst.value && isManagedConfigKey(a.key) !== isManagedConfigKey(b.key)) {
+        return isManagedConfigKey(a.key) ? -1 : 1
+      }
+      return a.key.localeCompare(b.key)
+    })
+})
 const hasNewVersion = computed(() => {
   if (!remoteVersion.value) {
     return false
@@ -238,6 +397,11 @@ const normalizeChapterVersionCount = (value: unknown): number => {
 }
 
 const normalizeConfigText = (value: unknown): string => String(value ?? '').trim()
+const isManagedConfigKey = (key: string): boolean => MANAGED_CONFIG_KEYS.has(key)
+const getConfigDomain = (key: string): string => {
+  const domain = normalizeConfigText(key).split('.')[0]
+  return domain || 'general'
+}
 
 const isHttpUrl = (value: string): boolean => {
   try {
@@ -517,17 +681,45 @@ const deleteConfig = async (key: string) => {
   }
 }
 
+const tableRowClassName = (row: SystemConfig) => (isManagedConfigKey(row.key) ? 'row-managed' : '')
+
 const columns: DataTableColumns<SystemConfig> = [
   {
     title: 'Key',
     key: 'key',
-    width: 220,
-    ellipsis: { tooltip: true }
+    width: 320,
+    render(row) {
+      return h(
+        NSpace,
+        { align: 'center', size: 6, wrap: true },
+        {
+          default: () => [
+            h('code', { class: 'key-code' }, row.key),
+            isManagedConfigKey(row.key)
+              ? h(NTag, { type: 'info', size: 'small', bordered: false }, { default: () => '托管' })
+              : h(
+                NTag,
+                { size: 'small', bordered: false },
+                { default: () => getConfigDomain(row.key) }
+              )
+          ]
+        }
+      )
+    }
   },
   {
     title: '值',
     key: 'value',
-    ellipsis: { tooltip: true }
+    render(row) {
+      return h(
+        'span',
+        {
+          class: 'value-text',
+          title: row.value
+        },
+        row.value
+      )
+    }
   },
   {
     title: '描述',
@@ -568,7 +760,9 @@ const columns: DataTableColumns<SystemConfig> = [
                 onPositiveClick: () => deleteConfig(row.key)
               },
               {
-                default: () => '确认删除该配置项？',
+                default: () => (isManagedConfigKey(row.key)
+                  ? '该项属于托管配置，建议优先使用上方快捷设置。确认删除？'
+                  : '确认删除该配置项？'),
                 trigger: () =>
                   h(
                     NButton,
@@ -594,6 +788,85 @@ onMounted(() => {
   width: 100%;
 }
 
+.overview-card {
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.12), rgba(255, 255, 255, 0.96));
+  border-radius: 16px;
+}
+
+.overview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.overview-copy {
+  max-width: 720px;
+}
+
+.overview-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.overview-subtitle {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.meta-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+}
+
+.meta-card {
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.health-grid {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.health-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fbfdff;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.health-label {
+  color: #475569;
+  font-size: 0.825rem;
+}
+
+.health-value {
+  margin: 4px 0 8px;
+  color: #0f172a;
+  font-size: 0.925rem;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.health-value-url {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .top-settings-grid {
   display: grid;
   gap: 16px;
@@ -616,6 +889,13 @@ onMounted(() => {
   font-size: 1.25rem;
   font-weight: 600;
   color: #1f2937;
+}
+
+.card-subtitle {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 .version-form {
@@ -673,17 +953,68 @@ onMounted(() => {
   color: #b91c1c;
 }
 
+.table-toolbar {
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.risk-alert {
+  margin-bottom: 12px;
+}
+
+.toolbar-search {
+  min-width: 280px;
+  flex: 1;
+}
+
+.key-code {
+  background: #eef2ff;
+  color: #312e81;
+  border-radius: 8px;
+  padding: 2px 6px;
+  font-size: 0.8125rem;
+  word-break: break-all;
+}
+
+.value-text {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: min(52vw, 560px);
+}
+
+.config-table :deep(.row-managed td) {
+  background: rgba(59, 130, 246, 0.06);
+}
+
 .config-modal {
   max-width: min(640px, 92vw);
 }
 
 @media (max-width: 767px) {
+  .meta-grid {
+    grid-template-columns: 1fr;
+  }
+
   .top-settings-grid {
     grid-template-columns: 1fr;
   }
 
   .card-title {
     font-size: 1.125rem;
+  }
+
+  .overview-title {
+    font-size: 1.125rem;
+  }
+
+  .toolbar-search {
+    min-width: 100%;
   }
 }
 </style>

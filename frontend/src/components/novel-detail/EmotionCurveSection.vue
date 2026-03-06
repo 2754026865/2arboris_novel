@@ -26,7 +26,7 @@
         </button>
         <button 
           @click="refreshData" 
-          class="md-icon-btn md-ripple"
+          class="md-btn md-btn-text md-ripple refresh-btn"
           :disabled="isLoading"
         >
           <svg 
@@ -481,21 +481,9 @@ watch(selectedEmotions, () => {
   background-color: var(--md-secondary-container-hover);
 }
 
-.md-icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  font-size: 1.25rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  color: var(--md-on-surface-variant);
-}
-
-.md-icon-btn:hover {
-  background-color: var(--md-on-surface-variant-hover);
+.refresh-btn {
+  gap: 8px;
+  padding: 0 12px;
 }
 
 .md-spinner {

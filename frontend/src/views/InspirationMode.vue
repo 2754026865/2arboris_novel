@@ -119,6 +119,7 @@ import { ref, nextTick, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useNovelStore } from '@/stores/novel'
 import type { UIControl, Blueprint } from '@/api/novel'
+import { getLLMConfig } from '@/api/llm'
 import ChatBubble from '@/components/ChatBubble.vue'
 import ConversationInput from '@/components/ConversationInput.vue'
 import BlueprintConfirmation from '@/components/BlueprintConfirmation.vue'
@@ -146,9 +147,61 @@ const completedBlueprint = ref<Blueprint | null>(null)
 const confirmationMessage = ref('')
 const blueprintMessage = ref('')
 const chatArea = ref<HTMLElement>()
+const isCheckingModelConfig = ref(false)
 
 const goBack = () => {
   router.push('/')
+}
+
+const hasRequiredModelConfig = async () => {
+  const llmConfig = await getLLMConfig()
+  if (!llmConfig) {
+    return false
+  }
+
+  const hasLLMModel = Boolean(llmConfig.llm_provider_model?.trim())
+  const hasEmbeddingModel = Boolean(llmConfig.embedding_provider_model?.trim())
+  return hasLLMModel && hasEmbeddingModel
+}
+
+const redirectToSettingsForModelConfig = async () => {
+  globalAlert.showAlert(
+    '请先在设置中配置并保存 LLM Model 与向量 Model，然后再开启灵感模式。',
+    'info',
+    '需要先完成模型配置',
+  )
+  await router.push({
+    name: 'settings',
+    query: {
+      source: 'inspiration',
+      reason: 'missing_models',
+    },
+  })
+}
+
+const ensureModelConfigOrRedirect = async () => {
+  if (isCheckingModelConfig.value) {
+    return false
+  }
+
+  isCheckingModelConfig.value = true
+  try {
+    const configReady = await hasRequiredModelConfig()
+    if (configReady) {
+      return true
+    }
+    await redirectToSettingsForModelConfig()
+    return false
+  } catch (error) {
+    console.error('检查模型配置失败:', error)
+    globalAlert.showError(
+      `检查模型配置失败: ${error instanceof Error ? error.message : '未知错误'}`,
+      '配置检查失败',
+    )
+    return false
+  } finally {
+    isCheckingModelConfig.value = false
+  }
 }
 
 // 清空所有状态，开始新的灵感对话
@@ -189,6 +242,11 @@ const backToConversation = () => {
 }
 
 const startConversation = async () => {
+  const canStartConversation = await ensureModelConfigOrRedirect()
+  if (!canStartConversation) {
+    return
+  }
+
   // 重置所有状态，开始全新的对话
   resetInspirationMode()
   conversationStarted.value = true
@@ -351,7 +409,12 @@ const scrollToBottom = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  const hasRequiredConfig = await ensureModelConfigOrRedirect()
+  if (!hasRequiredConfig) {
+    return
+  }
+
   const projectId = route.query.project_id as string
   if (projectId) {
     restoreConversation(projectId)

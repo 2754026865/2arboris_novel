@@ -1121,12 +1121,20 @@ async def select_chapter_version(
     try:
         llm_service = LLMService(session)
         ingest_service = ChapterIngestionService(llm_service=llm_service)
+        outline_stmt = select(ChapterOutline).where(
+            ChapterOutline.project_id == project_id,
+            ChapterOutline.chapter_number == request.chapter_number,
+        )
+        outline_result = await session.execute(outline_stmt)
+        outline = outline_result.scalars().first()
+        chapter_title = outline.title if outline and outline.title else f"第{request.chapter_number}章"
         await ingest_service.ingest_chapter(
             project_id=project_id,
             chapter_number=request.chapter_number,
-            title=chapter.title or f"第{request.chapter_number}章",
+            title=chapter_title,
             content=selected_version.content,
-            summary=None
+            summary=None,
+            user_id=current_user.id,
         )
         logger.info(f"章节 {request.chapter_number} 向量化入库成功")
     except Exception as e:

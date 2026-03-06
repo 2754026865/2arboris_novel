@@ -36,16 +36,16 @@
             </button>
             <button
               @click="confirmRegenerateChapter"
-              :disabled="generatingChapter === selectedChapterNumber"
+              :disabled="isSelectedChapterGeneratingLike"
               class="md-btn md-btn-filled md-ripple flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
             >
-              <svg v-if="generatingChapter === selectedChapterNumber" class="w-4 h-4 animate-spin" fill="currentColor" viewBox="0 0 20 20">
+              <svg v-if="isSelectedChapterGeneratingLike" class="w-4 h-4 animate-spin" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
               </svg>
               <svg v-else class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
               </svg>
-              {{ generatingChapter === selectedChapterNumber ? '生成中...' : '重新生成' }}
+              {{ isSelectedChapterGeneratingLike ? '生成中...' : '重新生成' }}
             </button>
           </div>
         </div>
@@ -278,6 +278,11 @@ const isChapterGenerating = (chapterNumber: number) => {
   return chapter && chapter.generation_status === 'generating'
 }
 
+const isSelectedChapterGeneratingLike = computed(() => {
+  if (props.selectedChapterNumber === null) return false
+  return props.generatingChapter === props.selectedChapterNumber || isChapterGenerating(props.selectedChapterNumber)
+})
+
 const isChapterFailed = (chapterNumber: number) => {
   if (!props.project?.chapters) return false
   const chapter = props.project.chapters.find(ch => ch.chapter_number === chapterNumber)
@@ -298,12 +303,12 @@ const isGeneratingInFlight = computed(() => {
   if (props.selectedChapterNumber === null) return false
   if (props.generatingChapter !== props.selectedChapterNumber) return false
 
-  // When retrying from failed state, backend status might lag behind.
+  // Regenerating a completed chapter can briefly keep backend status as `successful`
+  // before the async pipeline updates to `generating`.
   // Keep showing progress UI while local request is still in-flight.
   const status = selectedChapter.value?.generation_status
   return !(
     status === 'waiting_for_confirm' ||
-    status === 'successful' ||
     status === 'selecting'
   )
 })

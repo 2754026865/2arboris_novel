@@ -2,9 +2,10 @@
 import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
 import type { NovelSectionResponse, NovelSectionType } from '@/api/novel'
+import { API_BASE_URL } from './base'
+export { API_BASE_URL } from './base'
 
 // API 配置
-export const API_BASE_URL = import.meta.env.MODE === 'production' ? '' : 'http://127.0.0.1:8000'
 export const ADMIN_API_PREFIX = '/api/admin'
 
 // 统一请求封装

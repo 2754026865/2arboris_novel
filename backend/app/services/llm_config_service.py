@@ -95,6 +95,20 @@ class LLMConfigService:
         if "embedding_provider_url" in data and data["embedding_provider_url"] is not None:
             # HttpUrl 类型在 sqlite 中无法直接写入，需要提前转为字符串
             data["embedding_provider_url"] = str(data["embedding_provider_url"])
+
+        # 默认模式固定为 openai：仅在用户显式选择 ollama 时写入 ollama。
+        if "embedding_provider_format" in data:
+            raw_format = (data["embedding_provider_format"] or "").strip().lower()
+            data["embedding_provider_format"] = raw_format if raw_format in {"openai", "ollama"} else "openai"
+        elif not instance or not (instance.embedding_provider_format or "").strip():
+            data["embedding_provider_format"] = "openai"
+        logger.info(
+            "upsert llm config: user_id=%s embedding_provider_format=%s explicit_format=%s",
+            user_id,
+            data.get("embedding_provider_format", instance.embedding_provider_format if instance else None),
+            "embedding_provider_format" in payload.model_dump(exclude_unset=True),
+        )
+
         if instance:
             # Keep partial-update semantics via exclude_unset, while still allowing
             # explicit null values to clear persisted fields.

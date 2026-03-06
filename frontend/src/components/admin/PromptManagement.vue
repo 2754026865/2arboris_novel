@@ -23,26 +23,35 @@
       <n-spin :show="loading">
         <div :class="['prompt-layout', { mobile: isMobile }]">
           <div class="prompt-sidebar">
+            <div class="sidebar-header">
+              <span class="sidebar-title">Prompt 列表</span>
+              <n-tag size="small" type="info" round>{{ prompts.length }}</n-tag>
+            </div>
             <n-scrollbar class="prompt-scroll">
               <n-empty v-if="!prompts.length && !loading" description="暂无提示词" />
-              <n-space v-else vertical size="small">
-                <n-button
+              <div v-else class="prompt-list">
+                <button
                   v-for="prompt in prompts"
                   :key="prompt.id"
-                  type="primary"
-                  :ghost="selectedPrompt?.id !== prompt.id"
-                  quaternary
-                  block
+                  type="button"
+                  :class="['prompt-list-item', { active: selectedPrompt?.id === prompt.id }]"
                   @click="selectPrompt(prompt)"
                 >
-                  <div class="prompt-item">
-                    <span class="prompt-name">{{ prompt.title || prompt.name }}</span>
-                    <n-tag v-if="prompt.tags?.length" size="tiny" type="info">
-                      {{ prompt.tags.length }}
-                    </n-tag>
+                  <div class="prompt-item-main">
+                    <span class="prompt-item-title">{{ prompt.title || prompt.name }}</span>
+                    <span class="prompt-item-key">{{ prompt.name }}</span>
                   </div>
-                </n-button>
-              </n-space>
+                  <n-tag
+                    v-if="prompt.tags?.length"
+                    size="tiny"
+                    round
+                    :type="selectedPrompt?.id === prompt.id ? 'success' : 'info'"
+                  >
+                    {{ prompt.tags.length }} 标签
+                  </n-tag>
+                  <span v-else class="prompt-item-meta">无标签</span>
+                </button>
+              </div>
             </n-scrollbar>
           </div>
 
@@ -185,9 +194,59 @@ const createForm = reactive<PromptCreatePayload>({
 })
 
 const isMobile = ref(false)
+const NAME_REGEXP = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/
+const MAX_TITLE_LENGTH = 255
+const MAX_TAG_COUNT = 12
+const MAX_TAG_LENGTH = 24
+const MAX_SERIALIZED_TAG_LENGTH = 255
 
 const updateLayout = () => {
   isMobile.value = window.innerWidth < 920
+}
+
+const normalizeTags = (tags: string[] | null | undefined): string[] => {
+  const normalized = (tags || [])
+    .map((tag) => tag.trim())
+    .filter((tag) => Boolean(tag))
+  return Array.from(new Set(normalized))
+}
+
+const validateName = (name: string): string | null => {
+  if (!name) {
+    return '名称不能为空'
+  }
+  if (!NAME_REGEXP.test(name)) {
+    return '名称仅支持字母、数字、下划线和中划线，且必须以字母或数字开头'
+  }
+  return null
+}
+
+const validatePromptPayload = (payload: { title?: string; content: string; tags: string[] }): string | null => {
+  if (!payload.content.trim()) {
+    return '提示词内容不能为空'
+  }
+
+  if ((payload.title || '').trim().length > MAX_TITLE_LENGTH) {
+    return `标题长度不能超过 ${MAX_TITLE_LENGTH} 个字符`
+  }
+
+  if (payload.tags.length > MAX_TAG_COUNT) {
+    return `标签数量不能超过 ${MAX_TAG_COUNT} 个`
+  }
+
+  if (payload.tags.some((tag) => tag.length > MAX_TAG_LENGTH)) {
+    return `单个标签长度不能超过 ${MAX_TAG_LENGTH} 个字符`
+  }
+
+  if (payload.tags.some((tag) => tag.includes(','))) {
+    return '标签不能包含英文逗号'
+  }
+
+  if (payload.tags.join(',').length > MAX_SERIALIZED_TAG_LENGTH) {
+    return '标签总长度过长，请减少标签数量或缩短标签文本'
+  }
+
+  return null
 }
 
 const fetchPrompts = async () => {
@@ -225,21 +284,29 @@ const selectPrompt = (prompt: PromptItem) => {
   editForm.name = prompt.name
   editForm.title = prompt.title || ''
   editForm.content = prompt.content
-  editForm.tags = prompt.tags ? [...prompt.tags] : []
+  editForm.tags = normalizeTags(prompt.tags)
 }
 
 const savePrompt = async () => {
   if (!selectedPrompt.value) return
-  if (!editForm.content.trim()) {
-    showAlert('提示词内容不能为空', 'error')
+  const normalizedTags = normalizeTags(editForm.tags)
+  const validationError = validatePromptPayload({
+    title: editForm.title,
+    content: editForm.content,
+    tags: normalizedTags
+  })
+  if (validationError) {
+    showAlert(validationError, 'error')
     return
   }
+  editForm.tags = normalizedTags
+  const normalizedTitle = editForm.title.trim()
   saving.value = true
   try {
     const updated = await AdminAPI.updatePrompt(selectedPrompt.value.id, {
-      title: editForm.title || undefined,
+      title: normalizedTitle || undefined,
       content: editForm.content,
-      tags: editForm.tags
+      tags: normalizedTags
     })
     selectPrompt(updated)
     const index = prompts.value.findIndex((item) => item.id === updated.id)
@@ -282,17 +349,36 @@ const closeCreateModal = () => {
 }
 
 const createPrompt = async () => {
-  if (!createForm.name.trim() || !createForm.content.trim()) {
-    showAlert('名称与内容均为必填项', 'error')
+  const normalizedName = createForm.name.trim()
+  const nameError = validateName(normalizedName)
+  if (nameError) {
+    showAlert(nameError, 'error')
     return
   }
+  if (prompts.value.some((item) => item.name.toLowerCase() === normalizedName.toLowerCase())) {
+    showAlert('该名称已存在，请使用新的唯一标识', 'error')
+    return
+  }
+
+  const normalizedTags = normalizeTags(createForm.tags)
+  const validationError = validatePromptPayload({
+    title: createForm.title,
+    content: createForm.content,
+    tags: normalizedTags
+  })
+  if (validationError) {
+    showAlert(validationError, 'error')
+    return
+  }
+
+  createForm.tags = normalizedTags
   creating.value = true
   try {
     const created = await AdminAPI.createPrompt({
-      name: createForm.name.trim(),
+      name: normalizedName,
       title: createForm.title?.trim() || undefined,
       content: createForm.content,
-      tags: createForm.tags?.length ? [...createForm.tags] : undefined
+      tags: normalizedTags.length ? normalizedTags : undefined
     })
     prompts.value.unshift(created)
     selectPrompt(created)
@@ -347,36 +433,122 @@ onBeforeUnmount(() => {
 }
 
 .prompt-sidebar {
-  width: 260px;
+  width: 300px;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 0 2px;
+}
+
+.sidebar-title {
+  font-size: 0.85rem;
+  color: #374151;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .prompt-layout.mobile .prompt-sidebar {
   width: 100%;
-  max-height: 220px;
+  max-height: 260px;
 }
 
 .prompt-scroll {
   max-height: 520px;
+  padding-right: 2px;
 }
 
 .prompt-layout.mobile .prompt-scroll {
-  max-height: 200px;
+  max-height: 210px;
 }
 
-.prompt-item {
+.prompt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.prompt-list-item {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 10px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  font-weight: 500;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-.prompt-name {
+.prompt-list-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.prompt-list-item.active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.prompt-item-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.prompt-item-title {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  margin-right: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.prompt-item-key {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.prompt-item-meta {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.prompt-list-item:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.prompt-list-item:active {
+  transform: translateY(0);
+}
+
+.prompt-list-item :deep(.n-tag) {
+  flex-shrink: 0;
 }
 
 .prompt-editor {
@@ -410,7 +582,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1023px) {
   .prompt-sidebar {
-    width: 220px;
+    width: 260px;
   }
 }
 

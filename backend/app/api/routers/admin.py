@@ -205,7 +205,10 @@ async def create_prompt(
     service: PromptService = Depends(get_prompt_service),
     _: None = Depends(get_current_admin),
 ) -> PromptRead:
-    prompt = await service.create_prompt(payload)
+    try:
+        prompt = await service.create_prompt(payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     logger.info("管理员创建提示词：%s", prompt.id)
     return prompt
 
@@ -231,7 +234,10 @@ async def update_prompt(
     service: PromptService = Depends(get_prompt_service),
     _: None = Depends(get_current_admin),
 ) -> PromptRead:
-    result = await service.update_prompt(prompt_id, payload)
+    try:
+        result = await service.update_prompt(prompt_id, payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not result:
         logger.warning("提示词 %s 不存在，无法更新", prompt_id)
         raise HTTPException(status_code=404, detail="提示词不存在")

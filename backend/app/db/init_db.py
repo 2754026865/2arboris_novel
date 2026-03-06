@@ -66,8 +66,7 @@ async def init_db() -> None:
                 continue
             existing = await session.get(SystemConfig, entry.key)
             if existing:
-                if entry.key == "embedding.provider" and (existing.value or "").strip().lower() == "openai":
-                    # 升级默认嵌入提供方到 ollama，避免沿用旧版本默认值导致请求路径不匹配。
+                if entry.key == "embedding.provider" and not (existing.value or "").strip():
                     existing.value = value
                 if entry.description and existing.description != entry.description:
                     existing.description = entry.description
@@ -156,6 +155,13 @@ async def _ensure_schema_updates() -> None:
                     sync_conn.execute(text("ALTER TABLE llm_configs ADD COLUMN embedding_provider_model TEXT"))
                 if "embedding_provider_format" not in llm_columns:
                     sync_conn.execute(text("ALTER TABLE llm_configs ADD COLUMN embedding_provider_format TEXT"))
+                sync_conn.execute(
+                    text(
+                        "UPDATE llm_configs "
+                        "SET embedding_provider_format = 'openai' "
+                        "WHERE embedding_provider_format IS NULL OR TRIM(embedding_provider_format) = ''"
+                    )
+                )
         await conn.run_sync(_upgrade)
 
 

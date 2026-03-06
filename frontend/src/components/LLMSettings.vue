@@ -1,314 +1,227 @@
 <!-- AIMETA P=LLM设置_模型配置界面|R=LLM配置表单|NR=不含模型调用|E=component:LLMSettings|X=internal|A=设置组件|D=vue|S=dom,net|RD=./README.ai -->
 <template>
-  <div class="bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg p-8">
-    <h2 class="text-2xl font-bold text-gray-800 mb-6">LLM 配置</h2>
-    <h5 class="text-1xl font-bold text-gray-800 mb-6">建议使用自己的中转API和KEY</h5>
-    <form @submit.prevent="handleSave" class="space-y-6">
-      <div>
-        <label for="url" class="block text-sm font-medium text-gray-700">API URL</label>
-        <div class="relative mt-1">
-          <input
-            type="text"
-            id="url"
-            v-model="config.llm_provider_url"
-            class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            placeholder="https://api.example.com/v1"
-          >
-          <button
-            type="button"
-            @click="clearApiUrl"
-            class="absolute inset-y-0 right-2 flex items-center px-2 text-gray-400 hover:text-gray-600"
-            aria-label="清空 API URL"
-          >
-            <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div>
-        <label for="key" class="block text-sm font-medium text-gray-700">API Key</label>
-        <div class="relative mt-1">
-          <input
-            :type="showApiKey ? 'text' : 'password'"
-            id="key"
-            v-model="config.llm_provider_api_key"
-            class="block w-full px-3 py-2 pr-24 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            placeholder="留空则使用默认Key"
-          >
-          <button
-            type="button"
-            @click="clearApiKey"
-            class="absolute inset-y-0 right-2 flex items-center px-2 text-gray-400 hover:text-gray-600"
-            aria-label="清空 API Key"
-          >
-            <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            @click="toggleApiKeyVisibility"
-            class="absolute inset-y-0 right-10 flex items-center px-2 text-gray-400 hover:text-gray-600"
-            :aria-label="showApiKey ? '隐藏 API Key' : '显示 API Key'"
-          >
-            <svg v-if="showApiKey" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10 5c-4.478 0-8.268 2.943-9.542 7C1.732 16.057 5.522 19 10 19s8.268-2.943 9.542-7C18.268 7.943 14.478 5 10 5zm0 10a5 5 0 110-10 5 5 0 010 10z" fill-opacity="0.2" />
-              <path d="M10 7a3 3 0 100 6 3 3 0 000-6z" />
-            </svg>
-            <svg v-else class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zm13.707 0a4.167 4.167 0 11-8.334 0 4.167 4.167 0 018.334 0z" clip-rule="evenodd" />
-              <path d="M10 8a2 2 0 100 4 2 2 0 000-4z" />
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div>
-        <label for="model" class="block text-sm font-medium text-gray-700">Model</label>
-        <div class="flex gap-2 mt-1">
-          <div class="relative flex-1">
+  <section class="md-card md-card-elevated llm-settings">
+    <header class="llm-settings__header">
+      <h2 class="md-headline-small llm-settings__title">LLM 配置</h2>
+      <p class="md-body-medium llm-settings__subtitle">建议使用自己的 API URL 与 API Key，确保模型可控。</p>
+    </header>
+
+    <div v-if="saveFeedback.message" :class="['llm-feedback', `is-${saveFeedback.type}`]">
+      {{ saveFeedback.message }}
+    </div>
+
+    <form @submit.prevent="handleSave" class="llm-settings__form">
+      <div class="llm-settings__section md-card md-card-outlined">
+        <h3 class="md-title-medium llm-settings__section-title">主模型</h3>
+        <div class="llm-settings__grid">
+          <label class="md-text-field">
+            <span class="md-text-field-label">API URL</span>
             <input
+              id="url"
+              v-model="config.llm_provider_url"
               type="text"
+              class="md-text-field-input"
+              placeholder="https://api.example.com/v1"
+            >
+          </label>
+
+          <label class="md-text-field">
+            <span class="md-text-field-label">API Key</span>
+            <div class="llm-input-with-action">
+              <input
+                id="key"
+                v-model="config.llm_provider_api_key"
+                :type="showApiKey ? 'text' : 'password'"
+                class="md-text-field-input"
+                placeholder="留空则使用默认 Key"
+              >
+              <button type="button" class="llm-inline-action" @click="toggleApiKeyVisibility">
+                {{ showApiKey ? '隐藏' : '显示' }}
+              </button>
+            </div>
+          </label>
+        </div>
+
+        <div class="llm-model-row">
+          <label class="md-text-field llm-model-row__input">
+            <span class="md-text-field-label">Model</span>
+            <input
               id="model"
               v-model="config.llm_provider_model"
-              @focus="handleModelFocus"
-              @blur="hideDropdown"
-              class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              type="text"
+              class="md-text-field-input"
               placeholder="留空则使用默认模型"
+              @focus="handleModelFocus"
             >
-            <button
-              type="button"
-              @click="clearApiModel"
-              class="absolute inset-y-0 right-2 flex items-center px-2 text-gray-400 hover:text-gray-600"
-              aria-label="清空模型名称"
-            >
-              <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-              </svg>
-            </button>
-            <!-- 下拉选择提示框 -->
-            <div
-              v-if="showModelDropdown && availableModels.length > 0"
-              class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
-            >
-              <div
-                v-for="model in filteredModels"
-                :key="model"
-                @mousedown="selectModel(model)"
-                class="px-3 py-2 cursor-pointer hover:bg-indigo-50 hover:text-indigo-600 text-sm"
-              >
-                {{ model }}
-              </div>
-              <div v-if="filteredModels.length === 0" class="px-3 py-2 text-sm text-gray-500">
-                无匹配的模型
-              </div>
-            </div>
-          </div>
+          </label>
+
           <button
             type="button"
+            class="md-btn md-btn-tonal md-ripple llm-model-row__action"
+            :disabled="isLoadingModels"
             @click="manualTryLoadModels"
-            :disabled="isLoadingModels"
-            class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            <svg v-if="isLoadingModels" class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span>{{ isLoadingModels ? '加载中...' : '获取模型' }}</span>
-          </button>
-          <button
-            type="button"
-            @click="retryLoadModels"
-            :disabled="isLoadingModels"
-            class="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors disabled:bg-amber-400 disabled:cursor-not-allowed"
-          >
-            重试
+            {{ isLoadingModels ? '加载中...' : '获取模型列表' }}
           </button>
         </div>
-        <p v-if="lastLoadError" class="mt-2 text-sm text-red-600">{{ lastLoadError }}</p>
-        <p v-if="lastLoadInfo" class="mt-2 text-sm text-blue-600">{{ lastLoadInfo }}</p>
+        <div v-if="showModelDropdown" class="llm-suggestion-panel">
+          <div class="llm-suggestion-panel__header">
+            <span class="md-label-medium">可用主模型（{{ availableModels.length }}）</span>
+            <button type="button" class="llm-panel-action" @click="showModelDropdown = false">收起</button>
+          </div>
+          <div v-if="isLoadingModels" class="llm-suggestion-panel__empty">正在加载模型列表...</div>
+          <div v-else-if="filteredModels.length === 0" class="llm-suggestion-panel__empty">无匹配模型</div>
+          <div v-else class="llm-suggestion-panel__list">
+            <button
+              v-for="model in filteredModels"
+              :key="model"
+              type="button"
+              class="llm-suggestion-chip"
+              @click="selectModel(model)"
+            >
+              {{ model }}
+            </button>
+          </div>
+        </div>
+
+        <p v-if="lastLoadError" class="llm-hint is-error">{{ lastLoadError }}</p>
+        <p v-else-if="lastLoadInfo" class="llm-hint is-info">{{ lastLoadInfo }}</p>
       </div>
-      <div class="border border-gray-200 rounded-xl p-4 space-y-4">
-        <h3 class="text-base font-semibold text-gray-800">向量模型配置</h3>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">向量请求格式</label>
-          <div class="mt-2 inline-flex rounded-md shadow-sm overflow-hidden border border-gray-300">
+
+      <div class="llm-settings__section md-card md-card-outlined">
+        <h3 class="md-title-medium llm-settings__section-title">向量模型</h3>
+
+        <div class="llm-format-switch">
+          <span class="md-label-medium">请求格式</span>
+          <div class="llm-format-switch__group">
             <button
               type="button"
-              class="px-4 py-2 text-sm transition-colors"
-              :class="config.embedding_provider_format === 'openai'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50'"
+              class="llm-format-switch__item"
+              :class="{ active: config.embedding_provider_format === 'openai' }"
               @click="setEmbeddingProviderFormat('openai')"
             >
               OpenAI 兼容
             </button>
             <button
               type="button"
-              class="px-4 py-2 text-sm transition-colors border-l border-gray-300"
-              :class="config.embedding_provider_format === 'ollama'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50'"
+              class="llm-format-switch__item"
+              :class="{ active: config.embedding_provider_format === 'ollama' }"
               @click="setEmbeddingProviderFormat('ollama')"
             >
               Ollama
             </button>
           </div>
-          <p class="mt-2 text-xs text-gray-500">
-            当前格式：<code class="font-mono">{{ config.embedding_provider_format }}</code>
-            。OpenAI 兼容走 <code class="font-mono">/v1/embeddings</code>，Ollama 走
-            <code class="font-mono">/api/embed</code> 或 <code class="font-mono">/api/embeddings</code>。
-          </p>
         </div>
-        <label class="flex items-center gap-2 text-sm text-gray-700">
+
+        <p class="llm-hint">
+          当前格式：<code class="llm-code">{{ config.embedding_provider_format }}</code>
+          <span v-if="config.embedding_provider_format === 'openai'">，接口走 <code class="llm-code">/v1/embeddings</code>。</span>
+          <span v-else>，接口走 <code class="llm-code">/api/embed</code> 或 <code class="llm-code">/api/embeddings</code>。</span>
+        </p>
+
+        <label class="llm-checkbox-row">
           <input
             v-model="useMainUrlForEmbedding"
             type="checkbox"
-            class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
           >
-          复用主模型 API URL
+          <span>复用主模型 API URL</span>
         </label>
-        <div v-if="!useMainUrlForEmbedding">
-          <label for="embedding-url" class="block text-sm font-medium text-gray-700">向量 API URL</label>
-          <div class="relative mt-1">
-            <input
-              id="embedding-url"
-              v-model="config.embedding_provider_url"
-              type="text"
-              class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              :placeholder="embeddingUrlPlaceholder"
-            >
-            <button
-              type="button"
-              @click="clearEmbeddingUrl"
-              class="absolute inset-y-0 right-2 flex items-center px-2 text-gray-400 hover:text-gray-600"
-              aria-label="清空向量 API URL"
-            >
-              <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-              </svg>
-            </button>
-          </div>
-          <p class="mt-2 text-xs text-amber-600">
-            {{ embeddingUrlHint }}
-          </p>
-        </div>
-        <label class="flex items-center gap-2 text-sm text-gray-700">
+
+        <label v-if="!useMainUrlForEmbedding" class="md-text-field">
+          <span class="md-text-field-label">向量 API URL</span>
+          <input
+            id="embedding-url"
+            v-model="config.embedding_provider_url"
+            type="text"
+            class="md-text-field-input"
+            :placeholder="embeddingUrlPlaceholder"
+          >
+          <span class="llm-hint">{{ embeddingUrlHint }}</span>
+        </label>
+
+        <label class="llm-checkbox-row">
           <input
             v-model="useDedicatedEmbeddingApiKey"
             type="checkbox"
-            class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
           >
-          使用独立向量 API Key（可选）
+          <span>使用独立向量 API Key（可选）</span>
         </label>
-        <div v-if="useDedicatedEmbeddingApiKey">
-          <label for="embedding-key" class="block text-sm font-medium text-gray-700">向量 API Key</label>
-          <div class="relative mt-1">
+
+        <label v-if="useDedicatedEmbeddingApiKey" class="md-text-field">
+          <span class="md-text-field-label">向量 API Key</span>
+          <div class="llm-input-with-action">
             <input
-              :type="showEmbeddingApiKey ? 'text' : 'password'"
               id="embedding-key"
               v-model="config.embedding_provider_api_key"
-              class="block w-full px-3 py-2 pr-24 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              :type="showEmbeddingApiKey ? 'text' : 'password'"
+              class="md-text-field-input"
               placeholder="留空则复用主模型 API Key"
             >
-            <button
-              type="button"
-              @click="clearEmbeddingApiKey"
-              class="absolute inset-y-0 right-2 flex items-center px-2 text-gray-400 hover:text-gray-600"
-              aria-label="清空向量 API Key"
-            >
-              <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-              </svg>
+            <button type="button" class="llm-inline-action" @click="toggleEmbeddingApiKeyVisibility">
+              {{ showEmbeddingApiKey ? '隐藏' : '显示' }}
             </button>
-            <button
-              type="button"
-              @click="toggleEmbeddingApiKeyVisibility"
-              class="absolute inset-y-0 right-10 flex items-center px-2 text-gray-400 hover:text-gray-600"
-              :aria-label="showEmbeddingApiKey ? '隐藏向量 API Key' : '显示向量 API Key'"
+          </div>
+        </label>
+
+        <div class="llm-model-row">
+          <label class="md-text-field llm-model-row__input">
+            <span class="md-text-field-label">向量 Model</span>
+            <input
+              id="embedding-model"
+              v-model="config.embedding_provider_model"
+              type="text"
+              class="md-text-field-input"
+              placeholder="留空则使用系统默认向量模型"
+              @focus="handleEmbeddingModelFocus"
             >
-              <svg v-if="showEmbeddingApiKey" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10 5c-4.478 0-8.268 2.943-9.542 7C1.732 16.057 5.522 19 10 19s8.268-2.943 9.542-7C18.268 7.943 14.478 5 10 5zm0 10a5 5 0 110-10 5 5 0 010 10z" fill-opacity="0.2" />
-                <path d="M10 7a3 3 0 100 6 3 3 0 000-6z" />
-              </svg>
-              <svg v-else class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zm13.707 0a4.167 4.167 0 11-8.334 0 4.167 4.167 0 018.334 0z" clip-rule="evenodd" />
-                <path d="M10 8a2 2 0 100 4 2 2 0 000-4z" />
-              </svg>
+          </label>
+
+          <button
+            type="button"
+            class="md-btn md-btn-tonal md-ripple llm-model-row__action"
+            :disabled="isLoadingEmbeddingModels"
+            @click="manualTryLoadEmbeddingModels"
+          >
+            {{ isLoadingEmbeddingModels ? '加载中...' : '获取向量模型' }}
+          </button>
+        </div>
+        <div v-if="showEmbeddingModelDropdown" class="llm-suggestion-panel">
+          <div class="llm-suggestion-panel__header">
+            <span class="md-label-medium">可用向量模型（{{ availableEmbeddingModels.length }}）</span>
+            <button type="button" class="llm-panel-action" @click="showEmbeddingModelDropdown = false">收起</button>
+          </div>
+          <p class="llm-suggestion-panel__note">
+            接口返回的是全部模型，请手动选择支持向量/Embedding 的模型。
+          </p>
+          <div v-if="isLoadingEmbeddingModels" class="llm-suggestion-panel__empty">正在加载向量模型...</div>
+          <div v-else-if="filteredEmbeddingModels.length === 0" class="llm-suggestion-panel__empty">无匹配模型</div>
+          <div v-else class="llm-suggestion-panel__list">
+            <button
+              v-for="model in filteredEmbeddingModels"
+              :key="model"
+              type="button"
+              class="llm-suggestion-chip"
+              @click="selectEmbeddingModel(model)"
+            >
+              {{ model }}
             </button>
           </div>
         </div>
-        <div>
-          <label for="embedding-model" class="block text-sm font-medium text-gray-700">向量 Model</label>
-          <div class="flex gap-2 mt-1">
-            <div class="relative flex-1">
-              <input
-                id="embedding-model"
-                v-model="config.embedding_provider_model"
-                type="text"
-                @focus="handleEmbeddingModelFocus"
-                @blur="hideEmbeddingDropdown"
-                class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="留空则使用系统默认向量模型"
-              >
-              <button
-                type="button"
-                @click="clearEmbeddingModel"
-                class="absolute inset-y-0 right-2 flex items-center px-2 text-gray-400 hover:text-gray-600"
-                aria-label="清空向量模型名称"
-              >
-                <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                </svg>
-              </button>
-              <div
-                v-if="showEmbeddingModelDropdown && availableEmbeddingModels.length > 0"
-                class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
-              >
-                <div
-                  v-for="model in filteredEmbeddingModels"
-                  :key="model"
-                  @mousedown="selectEmbeddingModel(model)"
-                  class="px-3 py-2 cursor-pointer hover:bg-indigo-50 hover:text-indigo-600 text-sm"
-                >
-                  {{ model }}
-                </div>
-                <div v-if="filteredEmbeddingModels.length === 0" class="px-3 py-2 text-sm text-gray-500">
-                  无匹配的模型
-                </div>
-              </div>
-            </div>
-            <button
-              type="button"
-              @click="manualTryLoadEmbeddingModels"
-              :disabled="isLoadingEmbeddingModels"
-              class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              <svg v-if="isLoadingEmbeddingModels" class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span>{{ isLoadingEmbeddingModels ? '加载中...' : '获取模型' }}</span>
-            </button>
-            <button
-              type="button"
-              @click="retryLoadEmbeddingModels"
-              :disabled="isLoadingEmbeddingModels"
-              class="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors disabled:bg-amber-400 disabled:cursor-not-allowed"
-            >
-              重试
-            </button>
-          </div>
-          <p v-if="lastEmbeddingLoadError" class="mt-2 text-sm text-red-600">{{ lastEmbeddingLoadError }}</p>
-          <p v-if="lastEmbeddingLoadInfo" class="mt-2 text-sm text-blue-600">{{ lastEmbeddingLoadInfo }}</p>
-        </div>
+
+        <p v-if="lastEmbeddingLoadError" class="llm-hint is-error">{{ lastEmbeddingLoadError }}</p>
+        <p v-else-if="lastEmbeddingLoadInfo" class="llm-hint is-info">{{ lastEmbeddingLoadInfo }}</p>
       </div>
-      <div class="flex justify-end space-x-4 pt-4">
-        <button type="button" @click="handleDelete" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">删除配置</button>
-        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">保存</button>
-      </div>
+
+      <footer class="llm-settings__actions">
+        <button type="button" class="md-btn md-btn-outlined md-ripple llm-delete-btn" @click="handleDelete">
+          删除配置
+        </button>
+        <button type="submit" class="md-btn md-btn-filled md-ripple" :disabled="isSaving">
+          {{ isSaving ? '保存中...' : '保存配置' }}
+        </button>
+      </footer>
     </form>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -326,6 +239,10 @@ interface LLMSettingsForm {
   embedding_provider_model: string;
   embedding_provider_format: EmbeddingProviderFormat;
 }
+
+const emit = defineEmits<{
+  (e: 'saved'): void;
+}>();
 
 const createEmptyConfig = (): LLMSettingsForm => ({
   llm_provider_url: '',
@@ -355,6 +272,11 @@ const showEmbeddingModelDropdown = ref(false);
 const lastEmbeddingLoadError = ref('');
 const lastEmbeddingLoadInfo = ref('');
 const hasTriedAutoLoadEmbeddingModels = ref(false);
+const isSaving = ref(false);
+const saveFeedback = ref<{ type: 'success' | 'error'; message: string }>({
+  type: 'success',
+  message: '',
+});
 
 const inferEmbeddingProviderFormat = (rawUrl: string): EmbeddingProviderFormat => {
   const lower = rawUrl.toLowerCase();
@@ -424,8 +346,12 @@ const filteredEmbeddingModels = computed(() => {
 });
 
 onMounted(async () => {
-  const existingConfig = await getLLMConfig();
-  if (existingConfig) {
+  try {
+    const existingConfig = await getLLMConfig();
+    if (!existingConfig) {
+      return;
+    }
+
     const effectiveUrl = (existingConfig.embedding_provider_url || existingConfig.llm_provider_url || '').trim();
     const resolvedEmbeddingFormat: EmbeddingProviderFormat =
       existingConfig.embedding_provider_format || inferEmbeddingProviderFormat(effectiveUrl);
@@ -441,6 +367,9 @@ onMounted(async () => {
     };
     useMainUrlForEmbedding.value = !existingConfig.embedding_provider_url;
     useDedicatedEmbeddingApiKey.value = !!existingConfig.embedding_provider_api_key;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '未知错误';
+    saveFeedback.value = { type: 'error', message: `读取配置失败：${message}` };
   }
 });
 
@@ -466,19 +395,38 @@ const buildPayload = (): LLMConfigCreate => {
 };
 
 const handleSave = async () => {
-  await createOrUpdateLLMConfig(buildPayload());
-  alert('设置已保存！');
+  if (isSaving.value) {
+    return;
+  }
+
+  isSaving.value = true;
+  saveFeedback.value.message = '';
+  try {
+    await createOrUpdateLLMConfig(buildPayload());
+    saveFeedback.value = { type: 'success', message: '配置已保存。' };
+    emit('saved');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '未知错误';
+    saveFeedback.value = { type: 'error', message: `保存失败：${message}` };
+  } finally {
+    isSaving.value = false;
+  }
 };
 
 const handleDelete = async () => {
   if (confirm('确定要删除您的自定义LLM配置吗？删除后将恢复为默认配置。')) {
-    await deleteLLMConfig();
-    config.value = createEmptyConfig();
-    useMainUrlForEmbedding.value = true;
-    useDedicatedEmbeddingApiKey.value = false;
-    availableModels.value = [];
-    availableEmbeddingModels.value = [];
-    alert('配置已删除！');
+    try {
+      await deleteLLMConfig();
+      config.value = createEmptyConfig();
+      useMainUrlForEmbedding.value = true;
+      useDedicatedEmbeddingApiKey.value = false;
+      availableModels.value = [];
+      availableEmbeddingModels.value = [];
+      saveFeedback.value = { type: 'success', message: '配置已删除。' };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      saveFeedback.value = { type: 'error', message: `删除失败：${message}` };
+    }
   }
 };
 
@@ -492,30 +440,6 @@ const toggleApiKeyVisibility = () => {
 
 const toggleEmbeddingApiKeyVisibility = () => {
   showEmbeddingApiKey.value = !showEmbeddingApiKey.value;
-};
-
-const clearApiKey = () => {
-  config.value.llm_provider_api_key = '';
-};
-
-const clearEmbeddingApiKey = () => {
-  config.value.embedding_provider_api_key = '';
-};
-
-const clearApiUrl = () => {
-  config.value.llm_provider_url = '';
-};
-
-const clearApiModel = () => {
-  config.value.llm_provider_model = '';
-};
-
-const clearEmbeddingUrl = () => {
-  config.value.embedding_provider_url = '';
-};
-
-const clearEmbeddingModel = () => {
-  config.value.embedding_provider_model = '';
 };
 
 const getEffectiveEmbeddingUrl = (): string => (
@@ -587,7 +511,7 @@ const loadModelList = async ({
 
   if (!apiUrl) {
     if (!silent) {
-      alert(missingUrlMessage);
+      lastError.value = missingUrlMessage;
     }
     return;
   }
@@ -602,15 +526,12 @@ const loadModelList = async ({
       lastInfo.value = successInfoMessage;
       showDropdown.value = true;
     } else if (!silent) {
-      alert(emptyListMessage);
+      lastInfo.value = emptyListMessage;
     }
   } catch (error) {
     console.error(`Failed to load ${errorLabel}:`, error);
     const errorMessage = error instanceof Error ? error.message : '未知错误';
     lastError.value = `${errorLabel}失败：${errorMessage}`;
-    if (!silent) {
-      alert(`${errorLabel}失败：${errorMessage}`);
-    }
   } finally {
     isLoading.value = false;
   }
@@ -634,6 +555,7 @@ const loadModels = async (options?: { silent?: boolean }) => {
 };
 
 const manualTryLoadModels = async () => {
+  showModelDropdown.value = true;
   await loadModels();
 };
 
@@ -649,20 +571,13 @@ const loadEmbeddingModels = async (options?: { silent?: boolean }) => {
     showDropdown: showEmbeddingModelDropdown,
     missingUrlMessage: useMainUrlForEmbedding.value ? '请先填写主模型 API URL' : '请先填写向量 API URL',
     emptyListMessage: '未获取到向量模型列表，请检查 API URL 与认证配置（如需要）是否正确',
-    successInfoMessage: '已通过后端代理获取向量模型列表',
+    successInfoMessage: '已获取全部模型列表，请手动选择支持向量/Embedding 的模型',
     errorLabel: '获取向量模型列表',
   });
 };
 
-const retryLoadModels = async () => {
-  await loadModels();
-};
-
 const manualTryLoadEmbeddingModels = async () => {
-  await loadEmbeddingModels();
-};
-
-const retryLoadEmbeddingModels = async () => {
+  showEmbeddingModelDropdown.value = true;
   await loadEmbeddingModels();
 };
 
@@ -731,19 +646,280 @@ const selectEmbeddingModel = (model: string) => {
   config.value.embedding_provider_model = model;
   showEmbeddingModelDropdown.value = false;
 };
-
-const hideDropdownWithDelay = (dropdownState: Ref<boolean>): void => {
-  // 延迟隐藏，确保点击事件能触发
-  setTimeout(() => {
-    dropdownState.value = false;
-  }, 200);
-};
-
-const hideDropdown = () => {
-  hideDropdownWithDelay(showModelDropdown);
-};
-
-const hideEmbeddingDropdown = () => {
-  hideDropdownWithDelay(showEmbeddingModelDropdown);
-};
 </script>
+
+<style scoped>
+.llm-settings {
+  border-radius: var(--md-radius-xl);
+  padding: var(--md-spacing-6);
+}
+
+.llm-settings__header {
+  margin-bottom: var(--md-spacing-4);
+}
+
+.llm-settings__title {
+  margin: 0;
+  color: var(--md-on-surface);
+}
+
+.llm-settings__subtitle {
+  margin: var(--md-spacing-1) 0 0;
+  color: var(--md-on-surface-variant);
+}
+
+.llm-settings__form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--md-spacing-4);
+}
+
+.llm-settings__section {
+  border-radius: var(--md-radius-lg);
+  padding: var(--md-spacing-4);
+  overflow: visible;
+}
+
+.llm-settings__section-title {
+  margin: 0 0 var(--md-spacing-4);
+  color: var(--md-on-surface);
+}
+
+.llm-settings__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--md-spacing-3);
+}
+
+.llm-model-row {
+  margin-top: var(--md-spacing-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--md-spacing-2);
+}
+
+.llm-model-row__input {
+  min-width: 0;
+}
+
+.llm-model-row__action {
+  width: 100%;
+}
+
+.llm-input-with-action {
+  position: relative;
+}
+
+.llm-input-with-action .md-text-field-input {
+  padding-right: 72px;
+}
+
+.llm-inline-action {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--md-primary);
+  font-size: var(--md-label-medium);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.llm-inline-action:hover {
+  color: color-mix(in srgb, var(--md-primary) 80%, black);
+}
+
+.llm-panel-action {
+  border: none;
+  background: transparent;
+  color: var(--md-primary);
+  font-size: var(--md-label-medium);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.llm-panel-action:hover {
+  color: color-mix(in srgb, var(--md-primary) 80%, black);
+  text-decoration: underline;
+}
+
+.llm-suggestion-panel {
+  margin-top: var(--md-spacing-2);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-radius-md);
+  background-color: var(--md-surface-container-low);
+  padding: var(--md-spacing-3);
+}
+
+.llm-suggestion-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--md-spacing-2);
+}
+
+.llm-suggestion-panel__header .md-label-medium {
+  color: var(--md-on-surface-variant);
+}
+
+.llm-suggestion-panel__empty {
+  font-size: var(--md-body-small);
+  color: var(--md-on-surface-variant);
+  padding: var(--md-spacing-2) 0;
+}
+
+.llm-suggestion-panel__note {
+  margin: 0 0 var(--md-spacing-2);
+  font-size: var(--md-body-small);
+  color: var(--md-on-surface-variant);
+}
+
+.llm-suggestion-panel__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--md-spacing-2);
+  max-height: 220px;
+  overflow: auto;
+}
+
+.llm-suggestion-chip {
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-radius-full);
+  background-color: var(--md-surface);
+  color: var(--md-on-surface);
+  padding: 6px 12px;
+  font-size: var(--md-body-small);
+  cursor: pointer;
+  transition: all var(--md-duration-short) var(--md-easing-standard);
+}
+
+.llm-suggestion-chip:hover {
+  border-color: var(--md-primary);
+  background-color: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.llm-format-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--md-spacing-2);
+  align-items: center;
+}
+
+.llm-format-switch .md-label-medium {
+  color: var(--md-on-surface-variant);
+}
+
+.llm-format-switch__group {
+  display: inline-flex;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-radius-full);
+  overflow: hidden;
+}
+
+.llm-format-switch__item {
+  border: none;
+  background: transparent;
+  padding: 8px 14px;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  transition: all var(--md-duration-short) var(--md-easing-standard);
+}
+
+.llm-format-switch__item.active {
+  background-color: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.llm-format-switch__item:not(.active):hover {
+  background-color: color-mix(in srgb, var(--md-primary-container) 45%, white);
+}
+
+.llm-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--md-spacing-2);
+  color: var(--md-on-surface);
+  font-size: var(--md-body-medium);
+}
+
+.llm-checkbox-row input {
+  width: 16px;
+  height: 16px;
+}
+
+.llm-hint {
+  margin: var(--md-spacing-1) 0 0;
+  color: var(--md-on-surface-variant);
+  font-size: var(--md-body-small);
+}
+
+.llm-hint.is-error {
+  color: var(--md-error);
+}
+
+.llm-hint.is-info {
+  color: var(--md-primary);
+}
+
+.llm-code {
+  font-family: var(--md-font-mono);
+  font-size: 0.8rem;
+}
+
+.llm-settings__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--md-spacing-2);
+  grid-column: 1 / -1;
+}
+
+.llm-delete-btn {
+  color: var(--md-error);
+  border-color: color-mix(in srgb, var(--md-error) 40%, var(--md-outline));
+}
+
+.llm-delete-btn:hover {
+  background-color: var(--md-error-container);
+  color: var(--md-on-error-container);
+}
+
+.llm-feedback {
+  margin-bottom: var(--md-spacing-3);
+  border-radius: var(--md-radius-md);
+  padding: var(--md-spacing-3);
+  font-size: var(--md-body-medium);
+}
+
+.llm-feedback.is-success {
+  background-color: var(--md-success-container);
+  color: var(--md-on-success-container);
+}
+
+.llm-feedback.is-error {
+  background-color: var(--md-error-container);
+  color: var(--md-on-error-container);
+}
+
+@media (min-width: 768px) {
+  .llm-model-row {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .llm-model-row__action {
+    width: auto;
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 1280px) {
+  .llm-settings__form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+</style>
